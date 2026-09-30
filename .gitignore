@@ -1,0 +1,61 @@
+# Unity generated directories
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+/[Aa]rtifacts/
+/[Tt]est[Rr]esults/
+
+# IDE and editor state
+/.vs/
+/.idea/
+/.vscode/
+*.csproj
+*.csproj.user
+*.sln
+*.slnx
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.opendb
+*.VC.db
+
+# Unity and managed build artifacts
+*.pdb
+*.mdb
+*.mdb.meta
+*.pidb.meta
+*.pdb.meta
+*.dll.mdb
+*.tmp
+*.bak
+*.orig
+
+# Generated Unity tooling
+/Assets/AssetStoreTools*
+/Assets/Plugins/Editor/JetBrains*
+
+# Build outputs
+*.apk
+*.aab
+*.app
+*.unitypackage
+
+# Crash reports and local logs
+sysinfo.txt
+debug.log
+crashlytics-build.properties
+*.stackdump
+
+# Operating system files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
