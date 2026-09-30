@@ -985,6 +985,15 @@ MonoBehaviour:
   particleGridResolution: 7
   particleMass: 0.15
   particleCollisionRadius: 0.02
+  gravity: 9.81
+  solverSubsteps: 6
+  springStiffness: 70
+  springDamping: 1.4
+  enableVolmePreservaton: 1
+  volumeStiffness: 18.1
+  groundHeight: 0
+  bounce: 0.1
+  friction: 0.82
   showGeneratedSurface: 1
   showParticle: 1
   showSprings: 1

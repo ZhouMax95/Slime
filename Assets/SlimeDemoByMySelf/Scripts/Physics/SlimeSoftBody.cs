@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Unity.VisualScripting;
 using UnityEngine;
 
 namespace Slime
@@ -45,6 +44,8 @@ namespace Slime
         [SerializeField, Range(1, 12)] private int solverSubsteps = 6;
         [SerializeField, Min(0f)] private float springStiffness = 70f;
         [SerializeField, Min(0f)] private float springDamping = 1.4f;
+        [SerializeField] private bool enableVolumePreservation = true;
+        [SerializeField, Min(0f)] private float volumeStiffness = 18f;
 
         [Header("Collision")]
         [SerializeField]private float groundHeight = 0f;
@@ -98,6 +99,12 @@ namespace Slime
             {
                 ClearAndApplyExternalForces();
                 ApplySpringForces();
+
+                if (enableVolumePreservation)
+                {
+                    ApplyVolumePreservation();
+                }
+
                 Integrate(deltaTime);
                 touchedGround |= SolveGroundCollision(substepFriction);
             }
@@ -106,6 +113,20 @@ namespace Slime
         }
 
         #region physic
+
+        private void ApplyVolumePreservation()
+        {
+            Vector3 currentCenter = CalculateCenter();
+            for (int i = 0; i < particles.Count; i++)
+            {
+                SlimeParticle particle = particles[i];
+                Vector3 restOffset = particle.restPosition - restCenter;
+                Vector3 currentOffset = particle.position - currentCenter;
+                Vector3 shapeError = restOffset - currentOffset;
+                particle.force += shapeError * volumeStiffness;
+                particles[i] = particle;
+            }
+        }
 
         private void ClearAndApplyExternalForces()
         {
