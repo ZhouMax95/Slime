@@ -131,13 +131,13 @@ Material:
     - _EnvironmentReflections: 1
     - _GGXFirstIntensity: 5.1
     - _GGXFirstSoftness: 0.768
-    - _GGXFirstStyle: 0
+    - _GGXFirstStyle: 0.49
     - _GGXFirstThreshold: 0.5
     - _GGXLayerBlend: 0.5
     - _GGXSecondIntensity: 1.86
     - _GGXSecondSoftness: 0.038
     - _GGXSecondStyle: 1
-    - _GGXSecondThreshold: 0.1
+    - _GGXSecondThreshold: 0.2
     - _GlossMapScale: 1
     - _Glossiness: 0.4472136
     - _GlossyReflections: 1
@@ -183,7 +183,7 @@ Material:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _NPRSpecColor: {r: 1, g: 1, b: 1, a: 1}
-    - _ShadowColor: {r: 0.6189036, g: 0.6189036, b: 0.7169812, a: 1}
+    - _ShadowColor: {r: 0.61334103, g: 0.61334103, b: 0.7264151, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

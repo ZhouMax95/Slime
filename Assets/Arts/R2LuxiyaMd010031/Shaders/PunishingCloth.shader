@@ -16,9 +16,9 @@ Shader "CartoonShading/PunishingCloth"
         [Header(Normal Mapping)]
         _NormalScale("法线强度", Range(0, 2)) = 1
 
-        // ==================== NPR 二分阴影 ====================
-        [Header(NPR Shadow)]
-        // 暗部以基础色乘上此颜色，保留原贴图的颜色细节。
+        // ==================== NPR / PBR 共用二分阴影 ====================
+        [Header(Shared Toon Shadow)]
+        // NPR 与 PBR 二分漫反射共用此乘色，保留各自材质底色与贴图细节。
         _ShadowColor("暗部颜色", Color) = (0.5, 0.5, 0.65, 1)
         // 对应原始 NdotL 的明暗分界，值越大，暗部覆盖范围越大。
         _ShadowThreshold("明暗分界阈值", Range(-1, 1)) = 0
@@ -31,7 +31,7 @@ Shader "CartoonShading/PunishingCloth"
         // 先将黑点到白点之间的范围平滑映射为 0~1，避免非遮蔽区域整体变暗。
         _ShadowAOBlackPoint("固有阴影黑点", Range(0, 1)) = 0.02
         _ShadowAOWhitePoint("固有阴影白点", Range(0, 1)) = 0.33
-        // 0 完全忽略固有阴影，1 完全使用重映射结果，仅影响 NPR 分支。
+        // 0 完全忽略固有阴影，1 完全使用重映射结果；NPR 与 PBR 二分漫反射共用。
         _ShadowAOStrength("固有阴影强度", Range(0, 1)) = 1
 
         // ==================== NPR 风格化高光 ====================
@@ -59,11 +59,8 @@ Shader "CartoonShading/PunishingCloth"
 
         // ==================== PBR 直接漫反射模式 ====================
         [Header(PBR Direct Diffuse)]
-        // 关闭时保留标准 Lambert；开启时只将直接漫反射的余弦项替换成二分遮罩。
-        [ToggleUI] _PBRDiffuseToon("PBR 直接漫反射二分", Float) = 0
-        // 独立于 NPR 阈值，便于分别调试两条分支；使用带符号的 NdotL。
-        _PBRDiffuseThreshold("PBR 漫反射明暗阈值", Range(-1, 1)) = 0
-        _PBRDiffuseSoftness("PBR 漫反射过渡半宽", Range(0, 1)) = 0.05
+        // 关闭时保留标准 Lambert；开启时共用上方的阴影颜色、明暗分界和固有阴影。
+        [ToggleUI] _PBRDiffuseToon("PBR 漫反射使用统一二分阴影", Float) = 0
 
 
         // ==================== GGX D 项风格化对比 ====================
@@ -71,13 +68,13 @@ Shader "CartoonShading/PunishingCloth"
         // 默认关闭以保留 URP 原版高光；开启后只替换 PBR 直接高光内部的 D 项。
         [Toggle(_PBR_SPECULAR_STYLIZED)] _PBRSpecularStylized("启用 GGX D 项风格化", Float) = 0
         // 第一层通常设较低阈值，形成较宽的外层亮斑；D 可以超过 1，阈值不限制在 0~1。
-        _GGXFirstThreshold("第一层 D 阈值", Float) = 0.5
+        _GGXFirstThreshold("第一层 D 阈值", Range(0, 2)) = 0.5
         _GGXFirstSoftness("第一层过渡半宽", Range(0, 2)) = 0.1
         _GGXFirstIntensity("第一层亮斑强度", Range(0, 10)) = 1
         // 0 使用原始 GGX D，1 使用阈值亮斑；强度参数仅作用于风格化部分。
         _GGXFirstStyle("第一层风格化权重", Range(0, 1)) = 1
         // 第二层通常设较高阈值，形成较小、较亮的中心亮斑。
-        _GGXSecondThreshold("第二层 D 阈值", Float) = 2
+        _GGXSecondThreshold("第二层 D 阈值", Range(0, 2)) = 2
         _GGXSecondSoftness("第二层过渡半宽", Range(0, 2)) = 0.1
         _GGXSecondIntensity("第二层亮斑强度", Range(0, 10)) = 2
         _GGXSecondStyle("第二层风格化权重", Range(0, 1)) = 1
@@ -160,7 +157,7 @@ Shader "CartoonShading/PunishingCloth"
                 float4 _PBRMap_ST;
                 float4 _DebugMap_ST;
                 float _NormalScale;
-                // NPR 明暗分层参数。
+                // NPR / PBR 二分漫反射共用的明暗分层参数。
                 half4 _ShadowColor;
                 float _ShadowThreshold;
                 float _ShadowSoftness;
@@ -179,10 +176,8 @@ Shader "CartoonShading/PunishingCloth"
                 float _MetallicOffset;
                 float _RoughnessScale;
                 float _RoughnessOffset;
-                // PBR 直接漫反射的标准/二分切换与独立过渡参数。
+                // PBR 直接漫反射的标准/统一二分阴影切换。
                 float _PBRDiffuseToon;
-                float _PBRDiffuseThreshold;
-                float _PBRDiffuseSoftness;
                
                 // GGX D 项的两层阈值与强度参数。
                 float _PBRSpecularStylized;
@@ -241,7 +236,7 @@ Shader "CartoonShading/PunishingCloth"
                 half4 aoMap = SAMPLE_TEXTURE2D(_AOMap, sampler_AOMap, TRANSFORM_TEX(IN.uv, _AOMap));
                 half4 normalMap = SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, TRANSFORM_TEX(IN.uv, _NormalMap));
                 half4 pbrMap = SAMPLE_TEXTURE2D(_PBRMap, sampler_PBRMap, TRANSFORM_TEX(IN.uv, _PBRMap));
-                // PBRMap 提供材质参数；AOMap 的 G 通道提供 NPR 固有阴影。
+                // PBRMap 提供材质参数；AOMap.g 提供两种二分漫反射共用的固有阴影。
                 half metallic = saturate(pbrMap.r * _MetallicScale + _MetallicOffset);
                 // 调节感知粗糙度后转换回 URP BRDF 接口所需的光滑度。
                 // 粗糙度越高，高光越宽、环境反射越模糊；金属度与粗糙度相互独立。
@@ -278,11 +273,14 @@ Shader "CartoonShading/PunishingCloth"
                 shadowAO = saturate(shadowAO);
                 float finalLightBand = lightBand * shadowAO;
 
+                // ---------- 3.2. 共用亮暗乘色 ----------
+                // 亮部为 1，暗部为阴影色；NPR 与 PBR 二分分支使用同一个结果。
+                half3 toonDiffuseTint = lerp(_ShadowColor.rgb, half3(1, 1, 1), finalLightBand);
+
                 // ---------- 4. NPR 漫反射合成 ----------
                 // 固有阴影只使局部进入已定义的暗部颜色，不直接把基础色乘黑。
                 // 保留现有 PBRMap.b 对 NPR 的 AO 调节，方便与原有表现对照。
-                half3 shadowColor = baseMap.rgb * _ShadowColor.rgb;
-                half3 NPRDiffuse = lerp(shadowColor, baseMap.rgb, finalLightBand);
+                half3 NPRDiffuse = baseMap.rgb * toonDiffuseTint;
                 NPRDiffuse *= mainLight.color * mainLight.distanceAttenuation * ao;
 
                 // ---------- 5. NPR 风格化高光 ----------
@@ -311,12 +309,9 @@ Shader "CartoonShading/PunishingCloth"
                 half3 PBRDirectDiffuse = brdfData.diffuse * directRadiance;
                 if (_PBRDiffuseToon > 0.5)
                 {
-                    // smoothstep 直接替换 Lambert 项，不再重复乘 NdotL，以保留明确的明暗色阶。
-                    // 暗部的直接漫反射为 0，PBR 环境光仍按原逻辑提供间接照明。
-                    float diffuseSoftness = max(_PBRDiffuseSoftness, 0.0001);
-                    float diffuseBand = smoothstep(_PBRDiffuseThreshold - diffuseSoftness,
-                        _PBRDiffuseThreshold + diffuseSoftness, NdotL);
-                    PBRDirectDiffuse = brdfData.diffuse * directLightColor * diffuseBand;
+                    // 共用 NPR 的明暗边界与暗部颜色，不再重复乘 NdotL 使背光侧归零。
+                    // 保留 PBR 的金属度能量分配，统一阴影色不意味着恢复金属的漫反射。
+                    PBRDirectDiffuse = brdfData.diffuse * toonDiffuseTint * directLightColor;
                 }
                 // 只切换直接高光的标量 BRDF，保留同一套反射颜色与光照输入进行对比。
                 #if defined(_PBR_SPECULAR_STYLIZED)
@@ -346,7 +341,7 @@ Shader "CartoonShading/PunishingCloth"
                 // ---------- 9. NPR / PBR 最终混合 ----------
                 // 各自合成漫反射与高光，再按 PBRMap.a 插值，避免重复叠加两套高光。
                 half3 NPRColor = NPRDiffuse ;//+ NPRSpecular;
-                half3 PBRColor = PBRDirectDiffuse + PBRDirectSpecular + PBRIndirectDiffuse  + PBRIndirectSpecular * 0.1;
+                half3 PBRColor = PBRDirectDiffuse + PBRDirectSpecular + PBRIndirectDiffuse  + PBRIndirectSpecular ;
                 half3 finalColor = lerp(NPRColor, PBRColor, NPRPNRBlend);
                 return half4(finalColor.rgb, 1);
             }
