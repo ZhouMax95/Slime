@@ -80,29 +80,64 @@ public sealed class PunishingClothShaderGUI : ShaderGUI
             bool screen = mode.floatValue >= 0.5f && mode.floatValue < 1.5f;
             bool perspective = screen
                 && projection.floatValue >= 0.5f && projection.floatValue < 1.5f;
+            MaterialProperty depthScaling = FindProperty("_OutlineDepthScaling", properties);
+            MaterialProperty widthScalingMode = FindProperty("_OutlineWidthScalingMode", properties);
+            bool boundsDriven = !mixed && perspective && !depthScaling.hasMixedValue
+                && depthScaling.floatValue > 0.5f && !widthScalingMode.hasMixedValue
+                && widthScalingMode.floatValue > 0.5f;
 
             // 原版保留自己的宽度参数；透视校正版沿用单独的像素宽度。
             // 多选不同模式的材质时，两种宽度都允许编辑。
             using (new EditorGUI.DisabledScope(!mixed && perspective))
-                Property("_OutlineWidth");
-            using (new EditorGUI.DisabledScope(!mixed && !perspective))
+            {
+                if (boundsDriven)
+                {
+                    // 原脚本更新 _OutlineWidth；只读显示，不用滑块限制脚本传入的数值。
+                    MaterialProperty boundsWidth = FindProperty("_OutlineWidth", properties);
+                    EditorGUI.showMixedValue = boundsWidth.hasMixedValue;
+                    EditorGUILayout.FloatField("Bounds 传入线宽（像素）", boundsWidth.floatValue);
+                    EditorGUI.showMixedValue = false;
+                }
+                else
+                {
+                    Property("_OutlineWidth");
+                }
+            }
+            using (new EditorGUI.DisabledScope((!mixed && !perspective) || boundsDriven))
                 Property("_OutlineWidthPixels");
 
             // 只有全部所选材质都使用“像素宽度（透视校正）”时，才显示这个勾选项。
             if (!mixed && perspective)
             {
                 Property("_OutlineDepthScaling");
-                EditorGUILayout.HelpBox(
-                    "勾选：深度补偿到 1 个世界单位，超过后描边随距离变细。\n" +
-                    "不勾选：保持固定像素宽度。", MessageType.Info);
+                if (!IsOff("_OutlineDepthScaling"))
+                {
+                    editor.PopupShaderProperty(widthScalingMode, new GUIContent("线宽变化方式"),
+                        new[] { "相机观察深度", "Bounds 屏幕占比（C#）" });
+
+                    if (!widthScalingMode.hasMixedValue && widthScalingMode.floatValue >= 0.5f)
+                    {
+                        EditorGUILayout.HelpBox(
+                            "原 BoundsSetOutlineWidth 脚本每帧写入 _OutlineWidth，上方只读显示。\n" +
+                            "基础线宽和参考屏幕高度占比在脚本组件上调整。", MessageType.Info);
+                    }
+                    else
+                    {
+                        EditorGUILayout.HelpBox(
+                            "按相机观察深度补偿到 1 个世界单位，超过后描边随距离变细。", MessageType.Info);
+                    }
+                }
+                else
+                {
+                    EditorGUILayout.HelpBox("保持固定像素宽度。", MessageType.Info);
+                }
             }
 
             EditorGUILayout.HelpBox(
-                "世界空间：原版宽度 × 0.1 个世界单位。\n" +
+                "世界空间 / View：使用原版宽度，具体倍率见对应算法。\n" +
                 "屏幕比例：原版宽度 × 0.01 个 NDC 单位。\n" +
                 "原版像素：原版宽度直接表示像素数。\n" +
-                "透视校正：使用独立的透视校正像素宽度。\n" +
-                "View 空间：原版宽度 × 0.1 个观察空间单位，完整 XYZ 外扩通常与世界空间等价。", MessageType.Info);
+                "透视校正：可使用固定像素宽度、相机深度或 Bounds 屏幕占比。", MessageType.Info);
         }
 
         // ---------- 通道调试：贴图或顶点色共用 RGBA 选择 ----------

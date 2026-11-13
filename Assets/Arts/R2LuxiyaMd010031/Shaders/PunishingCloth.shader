@@ -81,8 +81,10 @@ Shader "CartoonShading/PunishingCloth"
         // 三种原版和观察空间版沿用原有宽度参数，保留各自公式中的系数。
         _OutlineWidth("原版描边宽度", Range(0, 6)) = 0.01
         _OutlineWidthPixels("透视校正宽度（像素）", Range(0, 10)) = 2
-        // 仅供透视校正模式使用。关闭保持固定像素宽度，开启使用深度限幅后的宽度。
+        // 仅供透视校正模式使用。关闭保持固定像素宽度，开启后选择变化方式。
         [ToggleUI] _OutlineDepthScaling("根据深度缩放宽度", Float) = 0
+        [Enum(CameraDepth, 0, BoundsScreenRatio, 1)] _OutlineWidthScalingMode("线宽变化方式", Float) = 0
+        // BoundsSetOutlineWidth 沿用原脚本，直接向上方 _OutlineWidth 写入像素线宽。
         // 保留旧值：0 原版像素，1 透视校正；新增 2 原版屏幕比例。
         [Enum(OriginalPixels, 0, PerspectiveCorrect, 1, OriginalRatio, 2)] _OutlineProjectionMode("屏幕描边计算方式", Float) = 1
 
@@ -159,6 +161,7 @@ Shader "CartoonShading/PunishingCloth"
                 float _OutlineWidthPixels;
                 float _OutlineProjectionMode;
                 float _OutlineDepthScaling;
+                float _OutlineWidthScalingMode;
             CBUFFER_END
         ENDHLSL
 
@@ -553,13 +556,26 @@ Shader "CartoonShading/PunishingCloth"
                 // ---------- 3. 选择线宽随距离变化的方式 ----------
                 if (_OutlineDepthScaling > 0.5)
                 {
-                    // 勾选：保留你的深度限幅算法，参考深度仍为 1。
-                    float referenceDepth = 1.0;
-                    float depth = max(-TransformWorldToView(positionWS).z, 0.001);
-                    float depthScale = min(depth / referenceDepth, 1.0);
+                    if (_OutlineWidthScalingMode < 0.5)
+                    {
+                        // 相机深度：保留你的限幅算法，参考深度仍为 1。
+                        float referenceDepth = 1.0;
+                        float depth = max(-TransformWorldToView(positionWS).z, 0.001);
+                        float depthScale = min(depth / referenceDepth, 1.0);
 
-                    // 不乘 w：近处的深度倍率抵消透视放大；超过参考深度后，线宽随距离缩小。
-                    positionCS.xy += offsetNDC * depthScale;
+                        // 不乘 w：近处抵消透视放大，超过参考深度后线宽随距离缩小。
+                        positionCS.xy += offsetNDC * depthScale;
+                    }
+                    else
+                    {
+                        // Bounds 屏幕占比：原 C# 把计算好的线宽写入 _OutlineWidth。
+                        // 这里不再乘深度倍率，避免同一份距离影响被重复计算。
+                        float boundsWidthPixels = max(_OutlineWidth, 0.0);
+                        float2 boundsOffsetNDC = directionPixels * boundsWidthPixels * 2.0 / screenSize;
+
+                        // 乘 w：GPU 除 w 后，像素宽度恰好等于 C# 传入的值。
+                        positionCS.xy += boundsOffsetNDC * positionCS.w;
+                    }
                 }
                 else
                 {

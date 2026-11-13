@@ -153,11 +153,13 @@ Material:
     - _NPRSpecThreshold: 0.5
     - _NormalScale: 1
     - _OcclusionStrength: 1
+    - _OutlineBoundsWidthPixels: 0
     - _OutlineDepthScaling: 1
     - _OutlineMode: 1
     - _OutlineProjectionMode: 1
     - _OutlineWidth: 0.52
     - _OutlineWidthPixels: 4
+    - _OutlineWidthScalingMode: 1
     - _PBRBlend: 1
     - _PBRDiffuseSoftness: 0.05
     - _PBRDiffuseThreshold: 0

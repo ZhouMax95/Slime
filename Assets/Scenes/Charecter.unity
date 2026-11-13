@@ -246,6 +246,11 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
+--- !u!137 &483332304 stripped
+SkinnedMeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 7046080918482151299, guid: f00cacd6689a6a54d9caa6a16009312a, type: 3}
+  m_PrefabInstance: {fileID: 8007637682582913032}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &870984011
 GameObject:
   m_ObjectHideFlags: 0
@@ -677,6 +682,11 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1945582508 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 1304073207197255342, guid: f00cacd6689a6a54d9caa6a16009312a, type: 3}
+  m_PrefabInstance: {fileID: 8007637682582913032}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &8007637682582913032
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -768,13 +778,32 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 1304073207197255342, guid: f00cacd6689a6a54d9caa6a16009312a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8007637682582913034}
   m_SourcePrefab: {fileID: 100100000, guid: f00cacd6689a6a54d9caa6a16009312a, type: 3}
 --- !u!4 &8007637682582913033 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 6742346754343209052, guid: f00cacd6689a6a54d9caa6a16009312a, type: 3}
   m_PrefabInstance: {fileID: 8007637682582913032}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &8007637682582913034
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1945582508}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1fc412fe8cccee347acdd50062a55e50, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BoundsSetOutlineWidth
+  targetCamera: {fileID: 1276341677}
+  render: {fileID: 483332304}
+  outlineWidth: 4
+  referenceHeight: 0.7
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
