@@ -123,6 +123,7 @@ Material:
     - _ClearCoatSmoothness: 0
     - _Cull: 2
     - _Cutoff: 0.5
+    - _DebugSource: 1
     - _DebugTextureEnabled: 0
     - _DetailAlbedoMapScale: 1
     - _DetailNormalMapScale: 1
@@ -152,6 +153,11 @@ Material:
     - _NPRSpecThreshold: 0.5
     - _NormalScale: 1
     - _OcclusionStrength: 1
+    - _OutlineDepthScaling: 1
+    - _OutlineMode: 1
+    - _OutlineProjectionMode: 1
+    - _OutlineWidth: 0.52
+    - _OutlineWidthPixels: 4
     - _PBRBlend: 1
     - _PBRDiffuseSoftness: 0.05
     - _PBRDiffuseThreshold: 0
@@ -183,6 +189,7 @@ Material:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _NPRSpecColor: {r: 1, g: 1, b: 1, a: 1}
+    - _OutlineColor: {r: 0, g: 0, b: 0, a: 1}
     - _ShadowColor: {r: 0.61334103, g: 0.61334103, b: 0.7264151, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
   m_BuildTextureStacks: []
