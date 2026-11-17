@@ -75,6 +75,8 @@ public sealed class PunishingClothShaderGUI : ShaderGUI
         {
             bool mixed = DrawOutlineMode();
             Property("_OutlineColor");
+            editor.PopupShaderProperty(FindProperty("_OutlineNormalEncoding", properties),
+                new GUIContent("描边法线编码"), new[] { "RGB（XYZ）", "八面体（RG）", "半八面体（RG）" });
             MaterialProperty mode = FindProperty("_OutlineMode", properties);
             MaterialProperty projection = FindProperty("_OutlineProjectionMode", properties);
             bool screen = mode.floatValue >= 0.5f && mode.floatValue < 1.5f;
@@ -84,7 +86,7 @@ public sealed class PunishingClothShaderGUI : ShaderGUI
             MaterialProperty widthScalingMode = FindProperty("_OutlineWidthScalingMode", properties);
             bool boundsDriven = !mixed && perspective && !depthScaling.hasMixedValue
                 && depthScaling.floatValue > 0.5f && !widthScalingMode.hasMixedValue
-                && widthScalingMode.floatValue > 0.5f;
+                && widthScalingMode.floatValue >= 0.5f && widthScalingMode.floatValue < 1.5f;
 
             // 原版保留自己的宽度参数；透视校正版沿用单独的像素宽度。
             // 多选不同模式的材质时，两种宽度都允许编辑。
@@ -109,13 +111,23 @@ public sealed class PunishingClothShaderGUI : ShaderGUI
             // 只有全部所选材质都使用“像素宽度（透视校正）”时，才显示这个勾选项。
             if (!mixed && perspective)
             {
+                Property("_OutlineZOffset");
                 Property("_OutlineDepthScaling");
                 if (!IsOff("_OutlineDepthScaling"))
                 {
                     editor.PopupShaderProperty(widthScalingMode, new GUIContent("线宽变化方式"),
-                        new[] { "相机观察深度", "Bounds 屏幕占比（C#）" });
+                        new[] { "相机观察深度", "Bounds 屏幕占比（C#）", "人物高度占比估算（Shader）" });
 
-                    if (!widthScalingMode.hasMixedValue && widthScalingMode.floatValue >= 0.5f)
+                    if (widthScalingMode.hasMixedValue)
+                    {
+                        EditorGUILayout.HelpBox("所选材质使用了不同的线宽变化方式。", MessageType.Info);
+                    }
+                    else if (widthScalingMode.floatValue < 0.5f)
+                    {
+                        EditorGUILayout.HelpBox(
+                            "按相机观察深度补偿到 1 个世界单位，超过后描边随距离变细。", MessageType.Info);
+                    }
+                    else if (widthScalingMode.floatValue < 1.5f)
                     {
                         EditorGUILayout.HelpBox(
                             "原 BoundsSetOutlineWidth 脚本每帧写入 _OutlineWidth，上方只读显示。\n" +
@@ -123,8 +135,13 @@ public sealed class PunishingClothShaderGUI : ShaderGUI
                     }
                     else
                     {
+                        // 只有人物高度估算已明确开启时才显示；混合勾选状态不显示。
+                        if (!depthScaling.hasMixedValue && depthScaling.floatValue > 0.5f)
+                            Property("_OutlineCharacterHeight");
                         EditorGUILayout.HelpBox(
-                            "按相机观察深度补偿到 1 个世界单位，超过后描边随距离变细。", MessageType.Info);
+                            "使用上方“透视校正宽度（像素）”。\n" +
+                            "按材质设置的人物高度、投影矩阵与模型原点深度估算屏幕高度占比，不读取 C# Bounds。\n" +
+                            "人物高度按世界单位填写，模型缩放后需自行同步。", MessageType.Info);
                     }
                 }
                 else
@@ -137,7 +154,7 @@ public sealed class PunishingClothShaderGUI : ShaderGUI
                 "世界空间 / View：使用原版宽度，具体倍率见对应算法。\n" +
                 "屏幕比例：原版宽度 × 0.01 个 NDC 单位。\n" +
                 "原版像素：原版宽度直接表示像素数。\n" +
-                "透视校正：可使用固定像素宽度、相机深度或 Bounds 屏幕占比。", MessageType.Info);
+                "透视校正：支持固定像素、相机深度、Bounds 占比或人物高度估算。", MessageType.Info);
         }
 
         // ---------- 通道调试：贴图或顶点色共用 RGBA 选择 ----------

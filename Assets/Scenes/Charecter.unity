@@ -521,6 +521,7 @@ MonoBehaviour:
   zoomSpeed: 0.15
   panSpeed: 0.0015
   heightRange: {x: -1, y: 2}
+  horizontalRange: {x: -2, y: 2}
   smoothTime: 0.25
 --- !u!1 &1465236802
 GameObject:
@@ -766,7 +767,7 @@ PrefabInstance:
     - target: {fileID: 7046080918482151299, guid: f00cacd6689a6a54d9caa6a16009312a, type: 3}
       propertyPath: m_Mesh
       value: 
-      objectReference: {fileID: 4300000, guid: ffc08570012415849a4cbbeee6536ad8, type: 2}
+      objectReference: {fileID: 4300000, guid: ae3a36573ef330d468cc9b2da16d3adc, type: 2}
     - target: {fileID: 8287302840231292443, guid: f00cacd6689a6a54d9caa6a16009312a, type: 3}
       propertyPath: m_IsActive
       value: 0

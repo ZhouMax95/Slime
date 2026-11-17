@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
-// 挂到透视相机：右键旋转、中键上下平移、滚轮缩放。
+// 挂到透视相机：右键旋转、中键上下左右平移、滚轮缩放。
 [RequireComponent(typeof(Camera))]
 [DisallowMultipleComponent]
 public sealed class CharacterInspectionCamera : MonoBehaviour
@@ -25,20 +25,22 @@ public sealed class CharacterInspectionCamera : MonoBehaviour
     [Tooltip("每格滚轮的缩放幅度，数值越大缩放越快。")]
     [SerializeField, Min(0f)] private float zoomSpeed = 0.15f;
 
-    [Header("中键上下平移")]
+    [Header("中键平移")]
     [Tooltip("平移速度会随观察距离缩放，近看细节时移动得更慢。")]
     [SerializeField, Min(0f)] private float panSpeed = 0.0015f;
     [Tooltip("相对初始观察中心，允许上下移动的距离范围。")]
     [SerializeField] private Vector2 heightRange = new Vector2(-1f, 2f);
+    [Tooltip("沿相机右方向，允许左右移动的距离范围。")]
+    [SerializeField] private Vector2 horizontalRange = new Vector2(-2f, 2f);
 
     [Header("运动阻尼")]
     [Tooltip("接近目标状态所需的时间。越大越柔和，越小越跟手；松开鼠标后继续平滑收尾。")]
     [SerializeField, Min(0.001f)] private float smoothTime = 0.12f;
 
     // 目标值只接收输入；当前值通过阻尼逐渐靠近目标值。
-    private float desiredYaw, desiredPitch, desiredDistance, desiredHeight;
-    private float yaw, pitch, distance, height;
-    private float yawVelocity, pitchVelocity, distanceVelocity, heightVelocity;
+    private float desiredYaw, desiredPitch, desiredDistance, desiredHeight, desiredHorizontal;
+    private float yaw, pitch, distance, height, horizontal;
+    private float yawVelocity, pitchVelocity, distanceVelocity, heightVelocity, horizontalVelocity;
     private Transform initializedTarget;
     private Camera viewCamera;
 
@@ -73,11 +75,15 @@ public sealed class CharacterInspectionCamera : MonoBehaviour
             smoothTime, Mathf.Infinity, deltaTime);
         height = Mathf.SmoothDamp(height, desiredHeight, ref heightVelocity,
             smoothTime, Mathf.Infinity, deltaTime);
+        horizontal = Mathf.SmoothDamp(horizontal, desiredHorizontal, ref horizontalVelocity,
+            smoothTime, Mathf.Infinity, deltaTime);
 
         // ---------- 围绕观察中心定位相机 ----------
-        // 平移时，观察中心与相机一起上下移动，保持观察方向不变。
-        Vector3 center = target.position + targetOffset + Vector3.up * height;
         Quaternion rotation = Quaternion.Euler(pitch, yaw, 0f);
+        // 纵向保留原来的世界向上；横向沿相机右方向，旋转后仍对应画面的左右。
+        // 观察中心和相机一起平移，平移本身不改变观察方向。
+        Vector3 center = target.position + targetOffset + Vector3.up * height
+            + rotation * Vector3.right * horizontal;
         Vector3 position = center - rotation * Vector3.forward * distance;
         transform.SetPositionAndRotation(position, rotation);
     }
@@ -95,8 +101,9 @@ public sealed class CharacterInspectionCamera : MonoBehaviour
             Mathf.Asin(Mathf.Clamp(offset.normalized.y, -1f, 1f)) * Mathf.Rad2Deg,
             pitchRange.x, pitchRange.y);
         height = desiredHeight = Mathf.Clamp(0f, heightRange.x, heightRange.y);
+        horizontal = desiredHorizontal = Mathf.Clamp(0f, horizontalRange.x, horizontalRange.y);
 
-        yawVelocity = pitchVelocity = distanceVelocity = heightVelocity = 0f;
+        yawVelocity = pitchVelocity = distanceVelocity = heightVelocity = horizontalVelocity = 0f;
         initializedTarget = target;
     }
 
@@ -122,6 +129,9 @@ public sealed class CharacterInspectionCamera : MonoBehaviour
 
         if (mouse.middleButton.isPressed)
         {
+            // 横向沿用当前纵向的拖动方向，并共用平移速度和距离倍率。
+            desiredHorizontal = Mathf.Clamp(
+                desiredHorizontal - delta.x * panSpeed * distance, horizontalRange.x, horizontalRange.y);
             desiredHeight = Mathf.Clamp(
                 desiredHeight - delta.y * panSpeed * distance, heightRange.x, heightRange.y);
         }
@@ -140,6 +150,7 @@ public sealed class CharacterInspectionCamera : MonoBehaviour
         pitchRange.x = Mathf.Clamp(pitchRange.x, -89f, 89f);
         pitchRange.y = Mathf.Clamp(pitchRange.y, pitchRange.x, 89f);
         heightRange.y = Mathf.Max(heightRange.x, heightRange.y);
+        horizontalRange.y = Mathf.Max(horizontalRange.x, horizontalRange.y);
         smoothTime = Mathf.Max(0.001f, smoothTime);
     }
 }

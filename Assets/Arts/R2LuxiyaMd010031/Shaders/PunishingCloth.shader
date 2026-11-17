@@ -78,12 +78,18 @@ Shader "CartoonShading/PunishingCloth"
         // ShaderGUI 将此参数与屏幕算法参数合成五种对比选项。
         [Enum(vertWSOutline, 0, vertCSOutline, 1, vertVSOutline, 2)] _OutlineMode("描边外扩模式", Float) = 1
         _OutlineColor("描边颜色", Color) = (0, 0, 0, 1)
+        // 与烘焙窗口一致：0 RGB，1 八面体，2 半八面体；默认保留当前的半八面体解码。
+        [Enum(RGB, 0, Oct, 1, HemiOct, 2)] _OutlineNormalEncoding("描边法线编码", Float) = 2
+        // 保留原先的裁剪空间 z 偏移，只在透视校正描边模式中使用。
+        _OutlineZOffset("描边 Z 偏移（裁剪空间）", Float) = 0.0008
         // 三种原版和观察空间版沿用原有宽度参数，保留各自公式中的系数。
         _OutlineWidth("原版描边宽度", Range(0, 6)) = 0.01
         _OutlineWidthPixels("透视校正宽度（像素）", Range(0, 10)) = 2
         // 仅供透视校正模式使用。关闭保持固定像素宽度，开启后选择变化方式。
         [ToggleUI] _OutlineDepthScaling("根据深度缩放宽度", Float) = 0
-        [Enum(CameraDepth, 0, BoundsScreenRatio, 1)] _OutlineWidthScalingMode("线宽变化方式", Float) = 0
+        [Enum(CameraDepth, 0, BoundsScreenRatio, 1, HeightRatio, 2)] _OutlineWidthScalingMode("线宽变化方式", Float) = 0
+        // 仅用于人物高度占比估算；按世界空间高度填写，默认沿用原来的 1.6。
+        _OutlineCharacterHeight("人物高度（世界单位）", Float) = 1.6
         // BoundsSetOutlineWidth 沿用原脚本，直接向上方 _OutlineWidth 写入像素线宽。
         // 保留旧值：0 原版像素，1 透视校正；新增 2 原版屏幕比例。
         [Enum(OriginalPixels, 0, PerspectiveCorrect, 1, OriginalRatio, 2)] _OutlineProjectionMode("屏幕描边计算方式", Float) = 1
@@ -156,12 +162,15 @@ Shader "CartoonShading/PunishingCloth"
                 float _PreviewChannel;
                 // 描边材质参数同样集中声明，后续启用描边 Pass 时直接复用。
                 half4 _OutlineColor;
+                float _OutlineNormalEncoding;
+                float _OutlineZOffset;
                 float _OutlineWidth;
                 float _OutlineMode;
                 float _OutlineWidthPixels;
                 float _OutlineProjectionMode;
                 float _OutlineDepthScaling;
                 float _OutlineWidthScalingMode;
+                float _OutlineCharacterHeight;
             CBUFFER_END
         ENDHLSL
 
@@ -470,170 +479,7 @@ Shader "CartoonShading/PunishingCloth"
             #pragma fragment frag
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-
-            // 材质常量已由共用 HLSLINCLUDE 提供，这里不要重复声明 CBUFFER。
-
-            struct Attributes
-            {
-                float4 positionOS : POSITION;
-                float3 normalOS : NORMAL;
-                float4 vertexColor : COLOR;
-                float4 tangentOS : TANGENT;
-            };
-
-            struct Varyings
-            {
-                float4 positionHCS : SV_POSITION;
-            };
-
-            // ---------- 观察空间：位置与法线都必须先转换到 View 空间 ----------
-            float4 vertVSOutline(float3 positionVS, float3 outlineNormalVS)
-            {
-
-                float refrenceDepth = 1.0;
-                float depth = max(-positionVS.z, 0.001);
-                float depthScale = min(depth / refrenceDepth, 1.0);
-                float width = _OutlineWidth * depthScale;
-
-                // 保留你的完整 XYZ 外扩，未压平法线 z；通常与世界空间外扩等价。
-                positionVS.xy += outlineNormalVS.xy * width * 0.01;
-                // View -> Clip 只需要投影矩阵，不能再次乘世界到观察矩阵。
-                return mul(GetViewToHClipMatrix(), float4(positionVS, 1.0));
-            }
-
-            // ---------- 世界空间：宽度随透视距离缩小 ----------
-            float4 vertWSOutline(float3 positionWS, float3 outlineNormalWS)
-            {
-                positionWS += outlineNormalWS * _OutlineWidth * 0.01;
-                return TransformWorldToHClip(positionWS);
-            }
-
-            // ---------- 原版一：按屏幕比例外扩，保留原来的 * 0.01 ----------
-            float4 vertCSOutlineOriginalRatio(float3 positionWS, float3 outlineNormalWS)
-            {
-                float4 positionCS = TransformWorldToHClip(positionWS);
-                float3 outlineNormalCS = TransformWorldToHClipDir(outlineNormalWS);
-                float2 directionCS = outlineNormalCS.xy;
-                directionCS /= max(length(directionCS), 0.0001);
-                positionCS.xy += directionCS * _OutlineWidth * 0.01 * positionCS.w;
-                return positionCS;
-            }
-
-            // ---------- 原版二：恢复原先注释中的像素公式，仍使用 _OutlineWidth ----------
-            float4 vertCSOutlineOriginalPixels(float3 positionWS, float3 outlineNormalWS)
-            {
-                float4 positionCS = TransformWorldToHClip(positionWS);
-                float3 outlineNormalCS = TransformWorldToHClipDir(outlineNormalWS);
-                float2 screenSize = _ScaledScreenParams.xy;
-                float2 directionPixels = outlineNormalCS.xy * screenSize;
-                directionPixels /= max(length(directionPixels), 0.0001);
-
-                float2 offsetNDC = directionPixels * _OutlineWidth * 2.0 / screenSize;
-                positionCS.xy += offsetNDC * positionCS.w;
-                return positionCS;
-            }
-
-            // ---------- 保留版：透视校正方向，使用独立的像素宽度 ----------
-            float4 vertCSOutlinePerspective(float3 positionWS, float3 outlineNormalWS)
-            {
-                // ---------- 1. 计算透视校正后的屏幕外扩方向 ----------
-                float4 positionCS = TransformWorldToHClip(positionWS);
-                // 方向使用 w=0 参与变换，不带入相机平移；保留投影后的 w 分量。
-                float4 directionCS = mul(GetWorldToHClipMatrix(), float4(outlineNormalWS, 0.0));
-                float2 screenSize = max(_ScaledScreenParams.xy, float2(1, 1));
-
-                // 透视校正：对 NDC = positionCS.xy / positionCS.w 求方向导数。
-                // 分母 w² 是共同的正数，后续归一化会抵消，因此只保留分子。
-                float2 directionNDC = directionCS.xy * positionCS.w - positionCS.xy * directionCS.w;
-                // 在像素尺度下归一化，避免横向、纵向因宽高比产生不同宽度。
-                float2 directionPixels = directionNDC * screenSize;
-                directionPixels /= max(length(directionPixels), 0.0001);
-
-                // ---------- 2. 像素宽度换算为 NDC 偏移 ----------
-                // NDC 跨度是 2，所以一个像素对应 2 / 分辨率。
-                float2 offsetNDC = directionPixels * _OutlineWidthPixels * 2.0 / screenSize;
-
-                // ---------- 3. 选择线宽随距离变化的方式 ----------
-                if (_OutlineDepthScaling > 0.5)
-                {
-                    if (_OutlineWidthScalingMode < 0.5)
-                    {
-                        // 相机深度：保留你的限幅算法，参考深度仍为 1。
-                        float referenceDepth = 1.0;
-                        float depth = max(-TransformWorldToView(positionWS).z, 0.001);
-                        float depthScale = min(depth / referenceDepth, 1.0);
-
-                        // 不乘 w：近处抵消透视放大，超过参考深度后线宽随距离缩小。
-                        positionCS.xy += offsetNDC * depthScale;
-                    }
-                    else
-                    {
-                        // Bounds 屏幕占比：原 C# 把计算好的线宽写入 _OutlineWidth。
-                        // 这里不再乘深度倍率，避免同一份距离影响被重复计算。
-                        float boundsWidthPixels = max(_OutlineWidth, 0.0);
-                        float2 boundsOffsetNDC = directionPixels * boundsWidthPixels * 2.0 / screenSize;
-
-                        // 乘 w：GPU 除 w 后，像素宽度恰好等于 C# 传入的值。
-                        positionCS.xy += boundsOffsetNDC * positionCS.w;
-                    }
-                }
-                else
-                {
-                    // 不勾选：乘 w 抵消后续透视除法，保持原来的固定像素宽度。
-                    positionCS.xy += offsetNDC * positionCS.w;
-                }
-                return positionCS;
-            }
-
-            // ---------- 屏幕模式选择：三种实现分开保留，方便逐行对比 ----------
-            float4 vertCSOutline(float3 positionWS, float3 outlineNormalWS)
-            {
-                if (_OutlineProjectionMode < 0.5)
-                    return vertCSOutlineOriginalPixels(positionWS, outlineNormalWS);
-                else if (_OutlineProjectionMode < 1.5)
-                    return vertCSOutlinePerspective(positionWS, outlineNormalWS);
-                else
-                    return vertCSOutlineOriginalRatio(positionWS, outlineNormalWS);
-            }
-
-            // ---------- 共用顶点入口：解码一次，再按材质参数选择实现 ----------
-            Varyings vertOutline(Attributes IN)
-            {
-                Varyings OUT = (Varyings)0;
-                VertexPositionInputs positionInputs = GetVertexPositionInputs(IN.positionOS.xyz);
-                float3 smoothNormalTS = normalize(IN.vertexColor.rgb * 2.0 - 1.0);
-                VertexNormalInputs normalInputs = GetVertexNormalInputs(IN.normalOS, IN.tangentOS);
-                float3x3 tangentToWorld = float3x3(
-                    normalInputs.tangentWS,
-                    normalInputs.bitangentWS,
-                    normalInputs.normalWS
-                );
-                float3 outlineNormalWS = normalize(TransformTangentToWorld(smoothNormalTS, tangentToWorld));
-
-                // 材质统一参数控制分支，无需手动改 #pragma，也不增加描边关键字变体。
-                if (_OutlineMode < 0.5)
-                {
-                    OUT.positionHCS = vertWSOutline(positionInputs.positionWS, outlineNormalWS);
-                }
-                else if (_OutlineMode < 1.5)
-                {
-                    OUT.positionHCS = vertCSOutline(positionInputs.positionWS, outlineNormalWS);
-                }
-                else
-                {
-                    // 法线按方向转换，不带平移；与 positionVS 保持相同坐标空间。
-                    float3 outlineNormalVS = TransformWorldToViewNormal(outlineNormalWS, true);
-                    OUT.positionHCS = vertVSOutline(positionInputs.positionVS, outlineNormalVS);
-                }
-
-                return OUT;
-            }
-
-            half4 frag(Varyings IN) : SV_Target
-            {
-                return half4(_OutlineColor.rgb,1);
-            }
-
+            #include "PunishingOutline.hlsl"
             ENDHLSL
         }
     }

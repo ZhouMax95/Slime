@@ -6,7 +6,7 @@ using UnityEngine;
 // 只处理当前选中对象自身的 Mesh，不遍历整个角色，方便逐个网格观察。
 public static class SmoothOutlineNormalBaker
 {
-    [MenuItem("Tools/描边/烘焙所选网格的平滑法线")]
+    [MenuItem("Tools/描边/烘焙所选网格的平滑法线（xyz）")]
     private static void BakeSelected()
     {
         // ---------- 1. 找到场景中选中的网格 ----------
