@@ -8,18 +8,17 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: R2Luxiya01001Body
-  m_Shader: {fileID: 4800000, guid: 933532a4fcc9baf4fa0491de14d08ed7, type: 3}
+  m_Shader: {fileID: 4800000, guid: b3a7d993e8347404e957e2e2e9ef1c98, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords:
+  m_ValidKeywords: []
+  m_InvalidKeywords:
   - _NORMALMAP
-  m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
-  stringTagMap:
-    RenderType: Opaque
+  stringTagMap: {}
   disabledShaderPasses:
   - MOTIONVECTORS
   m_LockedProperties: 
@@ -27,11 +26,15 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _AOMap:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: d5182857532dcc7418e4d8326a382496, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _BaseMap:
         m_Texture: {fileID: 2800000, guid: f0ee210bb9c6c74459d5b455bb1d009e, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BodySkinRampMap:
+        m_Texture: {fileID: 2800000, guid: 0ed1f4a2c82ea81498004bb64b296993, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _BumpMap:
@@ -39,7 +42,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _DebugMap:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: f0ee210bb9c6c74459d5b455bb1d009e, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _DetailAlbedoMap:
@@ -67,14 +70,10 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _NormalMap:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: 426a9cc9085b6ab47be2a480928c3e2c, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _OcclusionMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _PBRMap:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
@@ -137,23 +136,33 @@ Material:
     - _NPRSpecIntensity: 0.5
     - _NPRSpecSoftness: 0.05
     - _NPRSpecThreshold: 0.5
-    - _NormalScale: 1
+    - _NormalScale: 0.494
     - _OcclusionStrength: 1
+    - _OutlineCharacterHeight: 1.6
+    - _OutlineDepthScaling: 0
+    - _OutlineMode: 1
+    - _OutlineNormalEncoding: 2
+    - _OutlineProjectionMode: 1
     - _OutlineWidth: 0.01
+    - _OutlineWidthPixels: 2
+    - _OutlineWidthScalingMode: 0
+    - _OutlineZOffset: 0.0008
     - _PBRBlend: 1
     - _PBRDiffuseToon: 0
     - _PBRSpecularStylized: 0
     - _Parallax: 0.02
-    - _PreviewChannel: 4
+    - _PreviewChannel: 0
     - _QueueOffset: 0
+    - _RampTintStrength: 0.3
+    - _RampWithShadowColorOn: 0
     - _ReceiveShadows: 1
     - _RoughnessOffset: 0
     - _RoughnessScale: 1
     - _ShadowAOBlackPoint: 0.02
-    - _ShadowAOStrength: 1
-    - _ShadowAOWhitePoint: 0.33
-    - _ShadowSoftness: 0.05
-    - _ShadowThreshold: 0
+    - _ShadowAOStrength: 0.418
+    - _ShadowAOWhitePoint: 0.872
+    - _ShadowSoftness: 0.202
+    - _ShadowThreshold: 0.6
     - _Smoothness: 0.4472136
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
@@ -170,7 +179,7 @@ Material:
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _NPRSpecColor: {r: 1, g: 1, b: 1, a: 1}
     - _OutlineColor: {r: 0, g: 0, b: 0, a: 1}
-    - _ShadowColor: {r: 0.5, g: 0.5, b: 0.65, a: 1}
+    - _ShadowColor: {r: 0.8207547, g: 0.8207547, b: 0.8207547, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

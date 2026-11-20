@@ -2,7 +2,7 @@ using UnityEditor;
 using UnityEditor.Rendering;
 using UnityEngine;
 
-// PunishingCloth 专用材质面板：只负责参数显示与关键字同步。
+// PunishingCloth / PunishingBody 共用材质面板：只负责参数显示与关键字同步。
 // 使用 MaterialEditor 的原生控件，保留撤销、多材质编辑和贴图缩放/偏移。
 public sealed class PunishingClothShaderGUI : ShaderGUI
 {
@@ -10,7 +10,7 @@ public sealed class PunishingClothShaderGUI : ShaderGUI
     private MaterialProperty[] properties;
 
     // 折叠状态保存在当前 Inspector 中，不会写入材质。
-    private bool texturesOpen = true, shadowOpen = true, aoOpen = true;
+    private bool texturesOpen = true, rampOpen = true, shadowOpen = true, aoOpen = true;
     private bool pbrOpen = true, ggxOpen = true, nprOpen;
     private bool outlineOpen = true, debugOpen = true, settingsOpen;
 
@@ -18,6 +18,8 @@ public sealed class PunishingClothShaderGUI : ShaderGUI
     {
         editor = materialEditor;
         properties = materialProperties;
+        // Body 使用皮肤 Ramp；仅显示当前 Shader 保留的功能分区。
+        bool isBody = FindProperty("_BodySkinRampMap", properties, false) != null;
         EditorGUI.BeginChangeCheck();
 
         // ---------- 贴图：每张贴图保留独立的缩放和偏移 ----------
@@ -26,18 +28,30 @@ public sealed class PunishingClothShaderGUI : ShaderGUI
             Texture("_BaseMap");
             Texture("_AOMap");
             Texture("_NormalMap", "_NormalScale");
-            Texture("_PBRMap");
+            Texture(isBody ? "_BodySkinRampMap" : "_PBRMap");
         }
 
-        Group("NPR / PBR 共用二分阴影", ref shadowOpen,
-            "_ShadowColor", "_ShadowThreshold", "_ShadowSoftness");
-        Group("AOMap.G 固有阴影", ref aoOpen,
-            "_ShadowAOBlackPoint", "_ShadowAOWhitePoint", "_ShadowAOStrength");
-        Group("PBR 材质与直接漫反射", ref pbrOpen,
-            "_MetallicScale", "_MetallicOffset", "_RoughnessScale", "_RoughnessOffset", "_PBRDiffuseToon");
+        if (isBody)
+        {
+            Group("皮肤 Ramp 控制", ref rampOpen,
+                "_RampTintStrength", "_RampWithShadowColorOn");
+        }
+        // Body 关闭叠加时，二分阴影和 AO 都不参与计算；灰显对应参数便于对照。
+        using (new EditorGUI.DisabledScope(isBody && IsOff("_RampWithShadowColorOn")))
+        {
+            Group(isBody ? "身体二分阴影" : "NPR / PBR 共用二分阴影", ref shadowOpen,
+                "_ShadowColor", "_ShadowThreshold", "_ShadowSoftness");
+            Group("AOMap.G 固有阴影", ref aoOpen,
+                "_ShadowAOBlackPoint", "_ShadowAOWhitePoint", "_ShadowAOStrength");
+        }
+        if (!isBody)
+        {
+            Group("PBR 材质与直接漫反射", ref pbrOpen,
+                "_MetallicScale", "_MetallicOffset", "_RoughnessScale", "_RoughnessOffset", "_PBRDiffuseToon");
+        }
 
         // ---------- 高光：开关关闭时保留参数，禁用编辑以明确当前状态 ----------
-        if (Section("GGX D 项风格化高光", ref ggxOpen))
+        if (!isBody && Section("GGX D 项风格化高光", ref ggxOpen))
         {
             Property("_PBRSpecularStylized");
             using (new EditorGUI.DisabledScope(IsOff("_PBRSpecularStylized")))
@@ -57,7 +71,7 @@ public sealed class PunishingClothShaderGUI : ShaderGUI
             }
         }
 
-        if (Section("NPR 高光（当前停用）", ref nprOpen))
+        if (!isBody && Section("NPR 高光（当前停用）", ref nprOpen))
         {
             EditorGUILayout.HelpBox("当前 Shader 中的 NPR 高光计算已注释，以下参数暂不影响画面。", MessageType.Info);
             using (new EditorGUI.DisabledScope(true))

@@ -25,7 +25,6 @@ Material:
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
-  - _DEBUG_TEXTURE
   - _PBR_SPECULAR_STYLIZED
   m_InvalidKeywords:
   - _NORMALMAP
@@ -125,7 +124,7 @@ Material:
     - _Cull: 2
     - _Cutoff: 0.5
     - _DebugSource: 0
-    - _DebugTextureEnabled: 1
+    - _DebugTextureEnabled: 0
     - _DetailAlbedoMapScale: 1
     - _DetailNormalMapScale: 1
     - _DstBlend: 0
@@ -179,7 +178,7 @@ Material:
     - _ShadowAOStrength: 1
     - _ShadowAOWhitePoint: 0.346
     - _ShadowSoftness: 0.02
-    - _ShadowThreshold: 0.5
+    - _ShadowThreshold: 0.407
     - _Smoothness: 0.4472136
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
