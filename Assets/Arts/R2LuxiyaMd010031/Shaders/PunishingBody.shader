@@ -10,30 +10,37 @@ Shader "CartoonShading/PunishingBody"
         // 皮肤颜色 Ramp：按片元函数中的明暗权重采样。
         _BodySkinRampMap("身体皮肤 Ramp (Body Skin Ramp)", 2D) = "white" {}
 
-        // ==================== 皮肤 Ramp 控制 ====================
+        // ==================== 皮肤渲染方式 ====================
+        // 0 连续 Ramp；1 二分 Ramp 叠加阴影色；2 二分阴影叠加假 SSS 交界色带。
+        [Enum(Ramp, 0, ToonRamp, 1, FakeSSS, 2)] _SkinShadingMode("皮肤渲染方式", Float) = 1
         // 在白色与 Ramp 颜色之间混合：0 不改变基础色，1 完整使用 Ramp 乘色。
         _RampTintStrength("Ramp 染色强度", Range(0, 1)) = 0.3
-        // 保留片元中的 if：开启后额外叠乘二分阴影颜色，并接入 AOMap.g 固有阴影。
-        [ToggleUI] _RampWithShadowColorOn("Ramp 叠加二分阴影与 AO", Float) = 1
 
         // ==================== 法线控制 ====================
         // 控制切线空间法线的凹凸强度；设为 0 时使用模型自身法线。
         _NormalScale("法线强度", Range(0, 2)) = 1
 
         // ==================== 身体二分阴影 ====================
-        // 开启 Ramp 叠加阴影时使用；在暗部颜色与白色之间插值，保留基础色细节。
+        // 方式 1 和 2 使用；在暗部颜色与白色之间插值，保留基础色细节。
         _ShadowColor("暗部颜色", Color) = (0.5, 0.5, 0.65, 1)
         // 当前输入为半兰伯特值，分界越大，暗部覆盖范围越大。
         _ShadowThreshold("明暗分界阈值", Range(-1, 1)) = 0
         // 阈值两侧的过渡半宽，越接近 0，二分边界越硬。
         _ShadowSoftness("明暗过渡半宽", Range(0, 1)) = 0.05
+        // 缩放 fwidth(NdotL) 提供的抗锯齿宽度，默认沿用原来的 0.5 倍。
+        _ShadowAAFactor("阴影边缘抗锯齿倍率", Range(0, 2)) = 0.5
+
+        // ==================== 假 SSS 交界色带 ====================
+        // 仅方式 2 使用：在明暗过渡区加色，强度设为 0 即关闭色带。
+        _ShadowEdgeColor("假 SSS 交界颜色", Color) = (0.3, 0, 0, 1)
+        _ShadowEdgeStrength("假 SSS 交界强度", Range(0, 2)) = 1
 
         // ==================== G 通道固有阴影 ====================
         // AOMap.g 的通道值需按贴图实际范围校正，不能直接当作白色 1 使用。
         // 先将黑点到白点之间的范围平滑映射为 0~1，避免非遮蔽区域整体变暗。
         _ShadowAOBlackPoint("固有阴影黑点", Range(0, 1)) = 0.02
         _ShadowAOWhitePoint("固有阴影白点", Range(0, 1)) = 0.33
-        // 0 完全忽略固有阴影，1 完全使用重映射结果；仅在叠加阴影开关开启时生效。
+        // 三种方式共用 AO：0 完全忽略固有阴影，1 完全使用重映射结果。
         _ShadowAOStrength("固有阴影强度", Range(0, 1)) = 1
 
         // ==================== 描边渲染 ====================
@@ -85,13 +92,16 @@ Shader "CartoonShading/PunishingBody"
                 float4 _BodySkinRampMap_ST;
                 float4 _DebugMap_ST;
                 float _NormalScale;
-                // Ramp 染色与额外阴影的独立控制；开关使用普通 if，无需着色器关键字。
+                // 使用普通 if 切换三种方式，无需着色器关键字。
                 float _RampTintStrength;
-                float _RampWithShadowColorOn;
+                float _SkinShadingMode;
                 // 身体二分阴影的颜色、分界与过渡参数。
                 half4 _ShadowColor;
+                half4 _ShadowEdgeColor;
                 float _ShadowThreshold;
                 float _ShadowSoftness;
+                float _ShadowAAFactor;
+                float _ShadowEdgeStrength;
                 // 固有阴影的通道范围校正与强度控制。
                 float _ShadowAOBlackPoint;
                 float _ShadowAOWhitePoint;
@@ -209,8 +219,6 @@ Shader "CartoonShading/PunishingBody"
                 half4 aoMap = SAMPLE_TEXTURE2D(_AOMap, sampler_AOMap, TRANSFORM_TEX(IN.uv, _AOMap));
                 half4 normalMap = SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, TRANSFORM_TEX(IN.uv, _NormalMap));
                 
-                
-
                 // ---------- 2. 逐像素法线 ----------
                 // 使用插值后的 TBN 转换贴图法线；最终归一化需保留在片元阶段。
                 half3 normalTS = UnpackNormalScale(normalMap, _NormalScale);
@@ -218,31 +226,47 @@ Shader "CartoonShading/PunishingBody"
                 float3 normalWS = normalize(TransformTangentToWorld(normalTS, tangentToWorld));
 
                 Light mainLight = GetMainLight();
-                float NdotL = dot(normalWS, mainLight.direction) * 0.5 + 0.5;     
-                // 半兰伯特直接作为 Ramp 横坐标，保留贴图定义的连续肤色变化。
-                half4 pbrMap = SAMPLE_TEXTURE2D(_BodySkinRampMap, sampler_BodySkinRampMap, TRANSFORM_TEX(half2(NdotL, 0), _BodySkinRampMap));
-                half3 rampTint = lerp(half3(1, 1, 1), pbrMap.rgb, _RampTintStrength);
-                // Ramp 染色之外，再按需叠乘二分阴影；此分支也控制 AO 是否参与。
-                if (_RampWithShadowColorOn > 0.5)
+                float NdotL = dot(normalWS, mainLight.direction) * 0.5 + 0.5;              
+                float aaWidth = fwidth(NdotL) * _ShadowAAFactor;
+                float softness = max(_ShadowSoftness,aaWidth);
+                half3 rampTint = half3(1, 1, 1);
+                float shadowAOStart = min(_ShadowAOBlackPoint, _ShadowAOWhitePoint);
+                float shadowAOEnd = max(max(_ShadowAOBlackPoint, _ShadowAOWhitePoint),shadowAOStart + 0.0001);
+                float remappedAO = smoothstep(shadowAOStart, shadowAOEnd, aoMap.g);
+                float shadowAO = saturate(lerp(1.0, remappedAO, _ShadowAOStrength));
+                // ---------- 3. 皮肤渲染：三种方式独立比较 ----------
+                if (_SkinShadingMode < 0.5)
                 {
-                    float softness = max(0.0001, _ShadowSoftness);
-                    float lightBand = smoothstep(_ShadowThreshold - softness, _ShadowThreshold + softness, NdotL);
-                    float shadowAOStart = min(_ShadowAOBlackPoint, _ShadowAOWhitePoint);
-                    float shadowAOEnd = max(max(_ShadowAOBlackPoint, _ShadowAOWhitePoint),shadowAOStart + 0.0001);
-                    float remappedAO = smoothstep(shadowAOStart, shadowAOEnd, aoMap.g);
-                    float shadowAO = saturate(lerp(1.0, remappedAO, _ShadowAOStrength));         
-                    float finalLambert = lightBand * shadowAO;        
-                    half3 toonDiffuseTint = lerp(_ShadowColor.rgb, half3(1, 1, 1),finalLambert);
-                    rampTint *= toonDiffuseTint; 
-                }else
-                {
-                    // 关闭 Ramp 叠加阴影时，AOMap.g 不参与额外遮蔽。
-                    rampTint *= half3(1, 1, 1);
+                    // 方式 1：半兰伯特直接采样 Ramp，AO 直接乘到染色结果上。
+                    half4 rampMap = SAMPLE_TEXTURE2D(_BodySkinRampMap, sampler_BodySkinRampMap, TRANSFORM_TEX(half2(NdotL, 0.5), _BodySkinRampMap));
+                    rampTint = lerp(half3(1, 1, 1), rampMap.rgb, _RampTintStrength) * shadowAO;
                 }
+                else if (_SkinShadingMode < 1.5)
+                {
+                    // 方式 2：保留二分 Ramp、阴影乘色以及直接乘 AO 的原有算法。                
+                    float lightBand = smoothstep(_ShadowThreshold - softness, _ShadowThreshold + softness, NdotL);
+                    half4 rampMap = SAMPLE_TEXTURE2D(_BodySkinRampMap, sampler_BodySkinRampMap, TRANSFORM_TEX(half2(lightBand, 0.5), _BodySkinRampMap));
+                    half3 toonDiffuseTint = lerp(_ShadowColor.rgb, half3(1, 1, 1), lightBand);
+                    rampTint = lerp(half3(1, 1, 1), rampMap.rgb, _RampTintStrength);
+                    rampTint *= toonDiffuseTint *  shadowAO;
+                }
+                else
+                {
+                    // 方式 3：不采样 Ramp，二分阴影之外额外叠加交界暖色。               
+                    float lightBand = smoothstep(_ShadowThreshold - softness, _ShadowThreshold + softness, NdotL);
+                    half3 toonDiffuseTint = lerp(_ShadowColor.rgb, half3(1, 1, 1), lightBand);
+                    // 区间外为 0；中心 lightBand=0.5，乘 4 将遮罩峰值归一化为 1。
+                    //float shadowEdgeMask = 4.0 * lightBand * (1.0 - lightBand);    
+                    float edgeCenter = 0.35;
+                    float shadowEdgeMask = smoothstep(0.0, edgeCenter, lightBand) *(1.0 - smoothstep(edgeCenter, 1.0, lightBand));       
+                    half3 toonTint = lerp(toonDiffuseTint,toonDiffuseTint * _ShadowEdgeColor.rgb , saturate(shadowEdgeMask * _ShadowEdgeStrength));                             
+                    rampTint = toonTint * shadowAO ;
+                }
+
                 half3 toonDiffuse = baseMap.rgb  * rampTint;
                 toonDiffuse *= mainLight.color.rgb * mainLight.distanceAttenuation ;
 
-                return half4(toonDiffuse.rgb, 1); // 输出 Ramp 染色及可选的二分阴影。
+                return half4(toonDiffuse.rgb, 1); // 三种方式共用基础色与主光输出，便于比较。
             }
             ENDHLSL
         }

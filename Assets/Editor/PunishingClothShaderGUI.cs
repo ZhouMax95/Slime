@@ -10,7 +10,7 @@ public sealed class PunishingClothShaderGUI : ShaderGUI
     private MaterialProperty[] properties;
 
     // 折叠状态保存在当前 Inspector 中，不会写入材质。
-    private bool texturesOpen = true, rampOpen = true, shadowOpen = true, aoOpen = true;
+    private bool texturesOpen = true, rampOpen = true, shadowOpen = true, aoOpen = true, sssOpen = true;
     private bool pbrOpen = true, ggxOpen = true, nprOpen;
     private bool outlineOpen = true, debugOpen = true, settingsOpen;
 
@@ -22,27 +22,52 @@ public sealed class PunishingClothShaderGUI : ShaderGUI
         bool isBody = FindProperty("_BodySkinRampMap", properties, false) != null;
         EditorGUI.BeginChangeCheck();
 
+        // 先选择方式，再决定显示哪些参数；原生下拉框支持撤销和多材质编辑。
+        MaterialProperty skinMode = isBody ? FindProperty("_SkinShadingMode", properties) : null;
+        if (isBody && Section("皮肤渲染方式", ref rampOpen))
+        {
+            editor.PopupShaderProperty(skinMode, new GUIContent("渲染方式"),
+                new[] { "连续 Ramp", "二分 Ramp + 阴影色", "二分阴影 + 假 SSS" });
+            if (skinMode.hasMixedValue || skinMode.floatValue < 1.5f)
+                Property("_RampTintStrength");
+        }
+        bool showRamp = !isBody || skinMode.hasMixedValue || skinMode.floatValue < 1.5f;
+        bool showShadow = !isBody || skinMode.hasMixedValue || skinMode.floatValue >= 0.5f;
+        bool showSSS = isBody && (skinMode.hasMixedValue || skinMode.floatValue >= 1.5f);
+
         // ---------- 贴图：每张贴图保留独立的缩放和偏移 ----------
         if (Section("纹理与法线", ref texturesOpen))
         {
             Texture("_BaseMap");
             Texture("_AOMap");
             Texture("_NormalMap", "_NormalScale");
-            Texture(isBody ? "_BodySkinRampMap" : "_PBRMap");
+            if (showRamp)
+                Texture(isBody ? "_BodySkinRampMap" : "_PBRMap");
         }
 
-        if (isBody)
+        if (showShadow)
         {
-            Group("皮肤 Ramp 控制", ref rampOpen,
-                "_RampTintStrength", "_RampWithShadowColorOn");
+            if (isBody)
+            {
+                Group("身体二分阴影", ref shadowOpen,
+                    "_ShadowColor", "_ShadowThreshold", "_ShadowSoftness", "_ShadowAAFactor");
+            }
+            else
+            {
+                Group("NPR / PBR 共用二分阴影", ref shadowOpen,
+                    "_ShadowColor", "_ShadowThreshold", "_ShadowSoftness");
+            }
         }
-        // Body 关闭叠加时，二分阴影和 AO 都不参与计算；灰显对应参数便于对照。
-        using (new EditorGUI.DisabledScope(isBody && IsOff("_RampWithShadowColorOn")))
+        if (showSSS)
         {
-            Group(isBody ? "身体二分阴影" : "NPR / PBR 共用二分阴影", ref shadowOpen,
-                "_ShadowColor", "_ShadowThreshold", "_ShadowSoftness");
-            Group("AOMap.G 固有阴影", ref aoOpen,
-                "_ShadowAOBlackPoint", "_ShadowAOWhitePoint", "_ShadowAOStrength");
+            Group("假 SSS 交界色带", ref sssOpen,
+                "_ShadowEdgeColor", "_ShadowEdgeStrength");
+        }
+        if (Section("AOMap.G 固有阴影", ref aoOpen))
+        {
+            Property("_ShadowAOBlackPoint");
+            Property("_ShadowAOWhitePoint");
+            Property("_ShadowAOStrength");
         }
         if (!isBody)
         {

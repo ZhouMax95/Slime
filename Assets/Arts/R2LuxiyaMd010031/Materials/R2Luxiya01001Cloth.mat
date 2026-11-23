@@ -169,7 +169,7 @@ Material:
     - _PBRDiffuseToon: 1
     - _PBRSpecularStylized: 1
     - _Parallax: 0.02
-    - _PreviewChannel: 4
+    - _PreviewChannel: 2
     - _QueueOffset: 0
     - _ReceiveShadows: 1
     - _RoughnessOffset: 0.095
